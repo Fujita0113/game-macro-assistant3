@@ -1,0 +1,262 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gamemacroassistant.com/schemas/macro_v1.json",
+  "title": "Game Macro Assistant Macro Schema v1.0",
+  "description": "Schema definition for .gma.json macro files",
+  "type": "object",
+  "required": ["id", "name", "schemaVersion", "steps"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the macro"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name for the macro"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of what the macro does"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version - must be 1.0"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when macro was created"
+    },
+    "modifiedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when macro was last modified"
+    },
+    "isEncrypted": {
+      "type": "boolean",
+      "description": "Whether the macro data is encrypted"
+    },
+    "passphraseHash": {
+      "type": ["string", "null"],
+      "description": "Hash of the passphrase if encrypted (minimum 8 characters)"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "imageMatchThreshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.95,
+          "description": "SSIM threshold for image matching (R-013)"
+        },
+        "pixelDifferenceThreshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.03,
+          "description": "Pixel difference threshold (3% default per R-013)"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "default": 5000,
+          "description": "Timeout in milliseconds for operations"
+        },
+        "globalHotkey": {
+          "type": "string",
+          "default": "F9",
+          "description": "Global hotkey to execute this macro"
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum number of retries for failed operations"
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/mouseStep" },
+          { "$ref": "#/definitions/keyboardStep" },
+          { "$ref": "#/definitions/delayStep" },
+          { "$ref": "#/definitions/conditionalStep" }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "stepBase": {
+      "type": "object",
+      "required": ["id", "type", "order", "timestamp"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this step"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Execution order of this step"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this step was recorded"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of this step"
+        }
+      }
+    },
+    "mouseStep": {
+      "allOf": [
+        { "$ref": "#/definitions/stepBase" },
+        {
+          "properties": {
+            "type": { "const": "Mouse" },
+            "absolutePosition": {
+              "type": "object",
+              "required": ["x", "y"],
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" }
+              },
+              "description": "Screen absolute coordinates in pixels (R-002)"
+            },
+            "button": {
+              "type": "string",
+              "enum": ["Left", "Right", "Middle", "X1", "X2"],
+              "description": "Mouse button type"
+            },
+            "action": {
+              "type": "string",
+              "enum": ["Press", "Release", "Click", "DoubleClick", "Move"],
+              "description": "Mouse action to perform"
+            },
+            "pressDownTimeMs": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "How long button was held down in milliseconds (R-002)"
+            },
+            "screenshotData": {
+              "type": ["string", "null"],
+              "description": "Base64 encoded PNG screenshot (R-004)"
+            },
+            "conditionRegion": {
+              "type": ["object", "null"],
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" },
+                "width": { "type": "integer" },
+                "height": { "type": "integer" }
+              },
+              "description": "Region to check for image matching"
+            }
+          }
+        }
+      ]
+    },
+    "keyboardStep": {
+      "allOf": [
+        { "$ref": "#/definitions/stepBase" },
+        {
+          "properties": {
+            "type": { "const": "Keyboard" },
+            "virtualKeyCode": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255,
+              "description": "Windows virtual key code (R-003)"
+            },
+            "action": {
+              "type": "string",
+              "enum": ["Press", "Release"],
+              "description": "Key action"
+            },
+            "pressTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When key was pressed (R-003)"
+            },
+            "releaseTime": {
+              "type": ["string", "null"],
+              "format": "date-time",
+              "description": "When key was released (R-003)"
+            },
+            "screenshotData": {
+              "type": ["string", "null"],
+              "description": "Base64 encoded PNG screenshot"
+            }
+          }
+        }
+      ]
+    },
+    "delayStep": {
+      "allOf": [
+        { "$ref": "#/definitions/stepBase" },
+        {
+          "properties": {
+            "type": { "const": "Delay" },
+            "delayMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300000,
+              "description": "Delay duration in milliseconds"
+            }
+          }
+        }
+      ]
+    },
+    "conditionalStep": {
+      "allOf": [
+        { "$ref": "#/definitions/stepBase" },
+        {
+          "properties": {
+            "type": { "const": "Conditional" },
+            "conditionImage": {
+              "type": "string",
+              "description": "Base64 encoded PNG image to match"
+            },
+            "searchRegion": {
+              "type": "object",
+              "required": ["x", "y", "width", "height"],
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" },
+                "width": { "type": "integer", "minimum": 1 },
+                "height": { "type": "integer", "minimum": 1 }
+              },
+              "description": "Region to search for the condition image"
+            },
+            "matchThreshold": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0,
+              "default": 0.95,
+              "description": "Similarity threshold for image matching"
+            },
+            "onMatchSteps": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/stepBase" },
+              "description": "Steps to execute if image is found"
+            },
+            "onNoMatchSteps": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/stepBase" },
+              "description": "Steps to execute if image is not found"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
