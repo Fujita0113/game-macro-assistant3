@@ -131,16 +131,24 @@ public class CaptureErrorEventArgs : EventArgs
     }
 }
 
-// Placeholder interfaces
-public interface ILogger
-{
-    void LogError(Exception? exception, string message, params object[] args);
-    void LogError(string message, params object[] args);
-}
-
 public static class Screen
 {
-    public static ScreenInfo? PrimaryScreen => new() { Bounds = new Rectangle(0, 0, 1920, 1080) };
+    public static ScreenInfo? PrimaryScreen 
+    {
+        get
+        {
+            // Get actual screen dimensions using Windows API
+            var width = GetSystemMetrics(SM_CXSCREEN);
+            var height = GetSystemMetrics(SM_CYSCREEN);
+            return new ScreenInfo { Bounds = new Rectangle(0, 0, width, height) };
+        }
+    }
+
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
 }
 
 public class ScreenInfo

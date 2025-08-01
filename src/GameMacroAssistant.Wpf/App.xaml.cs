@@ -51,62 +51,7 @@ public partial class App : Application
                 services.AddTransient<MainView>();
                 services.AddTransient<EditorView>();
                 
-                // Register logger placeholder
+                // Register logger
                 services.AddSingleton<ILogger, ConsoleLogger>();
             });
-}
-
-// Placeholder implementations for missing services
-public class MacroRecorder : IMacroRecorder
-{
-    public event EventHandler<StepRecordedEventArgs>? StepRecorded;
-    public event EventHandler<RecordingStateChangedEventArgs>? RecordingStateChanged;
-    
-    public bool IsRecording { get; private set; }
-    
-    public Task StartRecordingAsync()
-    {
-        // TODO: Implement actual recording logic with Windows hooks
-        IsRecording = true;
-        RecordingStateChanged?.Invoke(this, new(true));
-        return Task.CompletedTask;
-    }
-    
-    public Task StopRecordingAsync()
-    {
-        IsRecording = false;
-        RecordingStateChanged?.Invoke(this, new(false));
-        return Task.CompletedTask;
-    }
-    
-    public void SetStopKey(int virtualKeyCode)
-    {
-        // TODO: Set up global hotkey hook
-    }
-    
-    public GameMacroAssistant.Core.Models.Macro GetRecordedMacro()
-    {
-        // TODO: Return recorded macro
-        return new GameMacroAssistant.Core.Models.Macro { Name = "Recorded Macro" };
-    }
-    
-    public void ClearRecording()
-    {
-        // TODO: Clear recorded steps
-    }
-}
-
-public class ConsoleLogger : ILogger
-{
-    public void LogError(Exception? exception, string message, params object[] args)
-    {
-        Console.WriteLine($"ERROR: {string.Format(message, args)}");
-        if (exception != null)
-            Console.WriteLine(exception.ToString());
-    }
-    
-    public void LogError(string message, params object[] args)
-    {
-        Console.WriteLine($"ERROR: {string.Format(message, args)}");
-    }
 }
