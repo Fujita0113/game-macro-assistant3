@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
+using System.IO;
 using GameMacroAssistant.Core.Models;
 using GameMacroAssistant.Core.Services;
 
@@ -10,6 +11,8 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IMacroRecorder _macroRecorder;
     private readonly IMacroExecutor _macroExecutor;
+    private readonly IMacroStorageService _storageService;
+    private string _macroDirectory;
     
     [ObservableProperty]
     private bool _isRecording;
@@ -25,16 +28,28 @@ public partial class MainViewModel : ObservableObject
     
     public ObservableCollection<Macro> Macros { get; } = new();
     
-    public MainViewModel(IMacroRecorder macroRecorder, IMacroExecutor macroExecutor)
+    public MainViewModel(IMacroRecorder macroRecorder, IMacroExecutor macroExecutor, IMacroStorageService storageService)
     {
-        _macroRecorder = macroRecorder;
-        _macroExecutor = macroExecutor;
-        
-        _macroRecorder.RecordingStateChanged += OnRecordingStateChanged;
-        _macroExecutor.ExecutionStateChanged += OnExecutionStateChanged;
-        
-        // TODO: Load saved macros from storage
-        LoadMacros();
+        try
+        {
+            _macroRecorder = macroRecorder;
+            _macroExecutor = macroExecutor;
+            _storageService = storageService;
+            
+            // Set default macro directory
+            var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            _macroDirectory = Path.Combine(documentsPath, "GameMacroAssistant", "Macros");
+            
+            _macroRecorder.RecordingStateChanged += OnRecordingStateChanged;
+            _macroExecutor.ExecutionStateChanged += OnExecutionStateChanged;
+            
+            StatusMessage = "Initializing...";
+            _ = LoadMacrosAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Initialization error: {ex.Message}";
+        }
     }
     
     [RelayCommand(CanExecute = nameof(CanStartRecording))]
@@ -121,6 +136,53 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = "Opening settings...";
     }
     
+    [RelayCommand]
+    private async Task LoadMacroFromFileAsync()
+    {
+        try
+        {
+            // TODO: Open file dialog
+            // For now, prompt for file path
+            StatusMessage = "File dialog would open here...";
+            
+            // Example loading
+            // var filePath = "path/to/macro.gma.json";
+            // var macro = await _storageService.LoadMacroAsync(filePath);
+            // if (macro != null) Macros.Add(macro);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load macro: {ex.Message}";
+        }
+    }
+    
+    [RelayCommand]
+    private async Task SaveMacroToFileAsync()
+    {
+        if (SelectedMacro == null) return;
+        
+        try
+        {
+            // TODO: Open save file dialog
+            var fileName = $"{SelectedMacro.Name}.gma.json";
+            var filePath = Path.Combine(_macroDirectory, fileName);
+            
+            await _storageService.SaveMacroAsync(SelectedMacro, filePath);
+            StatusMessage = $"Macro saved to {fileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to save macro: {ex.Message}";
+        }
+    }
+    
+    [RelayCommand]
+    private async Task RefreshMacroListAsync()
+    {
+        await LoadMacrosAsync();
+        StatusMessage = "Macro list refreshed";
+    }
+    
     private void OnRecordingStateChanged(object? sender, RecordingStateChangedEventArgs e)
     {
         IsRecording = e.IsRecording;
@@ -140,19 +202,43 @@ public partial class MainViewModel : ObservableObject
         ExecuteMacroCommand.NotifyCanExecuteChanged();
     }
     
-    private void LoadMacros()
+    private async Task LoadMacrosAsync()
     {
-        // TODO: Load macros from file system or database
-        // Placeholder data for testing
-        Macros.Add(new Macro 
-        { 
-            Name = "Sample Macro 1", 
-            Description = "A sample macro for testing" 
-        });
-        Macros.Add(new Macro 
-        { 
-            Name = "Sample Macro 2", 
-            Description = "Another sample macro" 
-        });
+        try
+        {
+            StatusMessage = "Loading macros...";
+            
+            if (!Directory.Exists(_macroDirectory))
+            {
+                Directory.CreateDirectory(_macroDirectory);
+            }
+            
+            var macroFiles = await _storageService.GetMacroFilesAsync(_macroDirectory);
+            
+            Macros.Clear();
+            
+            foreach (var filePath in macroFiles)
+            {
+                try
+                {
+                    var macro = await _storageService.LoadMacroAsync(filePath);
+                    if (macro != null)
+                    {
+                        Macros.Add(macro);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"Failed to load {Path.GetFileName(filePath)}: {ex.Message}";
+                }
+            }
+            
+            // Set Ready status after loading completes
+            StatusMessage = "Ready";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load macros: {ex.Message}";
+        }
     }
 }

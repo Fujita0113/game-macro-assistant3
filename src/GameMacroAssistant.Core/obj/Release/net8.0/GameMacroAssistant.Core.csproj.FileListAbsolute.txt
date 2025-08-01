@@ -1,0 +1,13 @@
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.csproj.AssemblyReference.cache
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.AssemblyInfoInputs.cache
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.AssemblyInfo.cs
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.csproj.CoreCompileInputs.cache
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.sourcelink.json
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\bin\Release\net8.0\GameMacroAssistant.Core.deps.json
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\bin\Release\net8.0\GameMacroAssistant.Core.dll
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\bin\Release\net8.0\GameMacroAssistant.Core.pdb
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.dll
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\refint\GameMacroAssistant.Core.dll
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\GameMacroAssistant.Core.pdb
+C:\Users\yufuj\Desktop\gameAutoProject3\src\GameMacroAssistant.Core\obj\Release\net8.0\ref\GameMacroAssistant.Core.dll

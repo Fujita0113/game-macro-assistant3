@@ -57,6 +57,29 @@
             
             <Separator Margin="10,0"/>
             
+            <Button Command="{Binding LoadMacroFromFileCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="📁" FontSize="12" Margin="0,0,5,0"/>
+                    <TextBlock Text="Load"/>
+                </StackPanel>
+            </Button>
+            
+            <Button Command="{Binding SaveMacroToFileCommand}" Margin="5,0,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="💾" FontSize="12" Margin="0,0,5,0"/>
+                    <TextBlock Text="Save"/>
+                </StackPanel>
+            </Button>
+            
+            <Button Command="{Binding RefreshMacroListCommand}" Margin="5,0,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🔄" FontSize="12" Margin="0,0,5,0"/>
+                    <TextBlock Text="Refresh"/>
+                </StackPanel>
+            </Button>
+            
+            <Separator Margin="10,0"/>
+            
             <Button Command="{Binding OpenSettingsCommand}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="⚙" FontSize="12" Margin="0,0,5,0"/>

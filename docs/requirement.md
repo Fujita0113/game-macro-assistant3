@@ -31,9 +31,6 @@
 |R-020|パフォーマンス閾値（CPU≤15%, RAM≤300MB）超過時は、進捗バーを赤く表示し**「High Load」トースト**で通知する。|パフォーマンス|
 |R-021|すべての対話可能なUIコントロールはスクリーンリーダー用のUIAプロパティを公開する。|アクセシビリティ|
 |R-022|100%以外のDPIスケーリングに関する既知の制限事項と座標変換アルゴリズムの擬似コードを`docs/troubleshooting.md`に明記する。|環境|
-|R-023|GitHub Actions上で`choco install winappdriver --version 1.6.2`を実行し、対話モードと5秒待機を挟んでUIテストを実行する。|品質保証|
-|R-024|CoverletとReportGeneratorでテストカバレッジを測定し、Coreレイヤーで80%以上を維持、結果は`CODECOV_TOKEN`（GitHub Secrets管理）を用いてCodecovへアップロードする。|品質保証|
-|R-025|UIを表示せずマクロを実行するCLIオプション（`--headless`）を提供する。|自動テスト|
 
 ---
 
