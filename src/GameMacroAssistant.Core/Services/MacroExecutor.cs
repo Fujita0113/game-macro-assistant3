@@ -1,4 +1,5 @@
 using GameMacroAssistant.Core.Models;
+using System.Runtime.InteropServices;
 
 namespace GameMacroAssistant.Core.Services;
 
@@ -19,7 +20,7 @@ public interface IMacroExecutor
     void Resume();
 }
 
-public class MacroExecutor : IMacroExecutor
+public partial class MacroExecutor : IMacroExecutor
 {
     private readonly IImageMatcher _imageMatcher;
     private readonly IScreenCaptureService _screenCapture;
@@ -174,16 +175,99 @@ public class MacroExecutor : IMacroExecutor
     
     private async Task ExecuteMouseStepAsync(MouseStep step, CancellationToken cancellationToken)
     {
-        // TODO: Implement mouse action execution with Windows API
-        // SetCursorPos, mouse_event, SendInput etc.
-        await Task.Delay(1, cancellationToken);
+        var startTime = DateTime.UtcNow;
+        
+        try
+        {
+            // Set cursor position first
+            if (!SetCursorPos(step.AbsolutePosition.X, step.AbsolutePosition.Y))
+            {
+                throw new InvalidOperationException($"Failed to set cursor position to {step.AbsolutePosition}");
+            }
+            
+            // Small delay to ensure cursor position is set
+            await Task.Delay(1, cancellationToken);
+            
+            // Execute mouse action based on type
+            switch (step.Action)
+            {
+                case MouseAction.Press:
+                    await ExecuteMousePress(step.Button, cancellationToken);
+                    break;
+                case MouseAction.Release:
+                    await ExecuteMouseRelease(step.Button, cancellationToken);
+                    break;
+                case MouseAction.Click:
+                    await ExecuteMouseClick(step.Button, cancellationToken);
+                    break;
+                case MouseAction.DoubleClick:
+                    await ExecuteMouseDoubleClick(step.Button, cancellationToken);
+                    break;
+                case MouseAction.Move:
+                    // Position already set above
+                    break;
+                default:
+                    throw new NotSupportedException($"Mouse action {step.Action} is not supported");
+            }
+            
+            // Validate timing accuracy as per R-014
+            var duration = DateTime.UtcNow - startTime;
+            if (duration.TotalMilliseconds > 15) // Max 15ms per R-014
+            {
+                _logger.LogError("Mouse step execution exceeded timing threshold: {Duration}ms", duration.TotalMilliseconds);
+                ExecutionError?.Invoke(this, new(ErrorCodes.ERR_TIM, $"Timing accuracy exceeded: {duration.TotalMilliseconds}ms"));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Mouse step execution failed");
+            throw;
+        }
     }
     
     private async Task ExecuteKeyboardStepAsync(KeyboardStep step, CancellationToken cancellationToken)
     {
-        // TODO: Implement keyboard action execution with Windows API
-        // SendInput with virtual key codes
-        await Task.Delay(1, cancellationToken);
+        var startTime = DateTime.UtcNow;
+        
+        try
+        {
+            var input = new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                U = new InputUnion
+                {
+                    ki = new KEYBDINPUT
+                    {
+                        wVk = (ushort)step.VirtualKeyCode,
+                        wScan = 0,
+                        dwFlags = step.Action == KeyAction.Release ? KEYEVENTF_KEYUP : 0,
+                        time = 0,
+                        dwExtraInfo = GetMessageExtraInfo()
+                    }
+                }
+            };
+            
+            var result = SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
+            if (result != 1)
+            {
+                throw new InvalidOperationException($"SendInput failed for key {step.VirtualKeyCode}");
+            }
+            
+            // Validate timing accuracy as per R-014
+            var duration = DateTime.UtcNow - startTime;
+            if (duration.TotalMilliseconds > 15) // Max 15ms per R-014
+            {
+                _logger.LogError("Keyboard step execution exceeded timing threshold: {Duration}ms", duration.TotalMilliseconds);
+                ExecutionError?.Invoke(this, new(ErrorCodes.ERR_TIM, $"Timing accuracy exceeded: {duration.TotalMilliseconds}ms"));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Keyboard step execution failed");
+            throw;
+        }
+        
+        await Task.CompletedTask;
     }
     
     private async Task ExecuteConditionalStepAsync(ConditionalStep step, CancellationToken cancellationToken)
@@ -257,4 +341,129 @@ public enum MacroExecutionState
     Running,
     Paused,
     Error
+}
+
+// Windows API mouse execution helper methods
+partial class MacroExecutor
+{
+    private async Task ExecuteMousePress(MouseButton button, CancellationToken cancellationToken)
+    {
+        var flags = GetMouseDownFlags(button);
+        mouse_event((uint)flags, 0, 0, 0, UIntPtr.Zero);
+        await Task.Delay(1, cancellationToken);
+    }
+    
+    private async Task ExecuteMouseRelease(MouseButton button, CancellationToken cancellationToken)
+    {
+        var flags = GetMouseUpFlags(button);
+        mouse_event((uint)flags, 0, 0, 0, UIntPtr.Zero);
+        await Task.Delay(1, cancellationToken);
+    }
+    
+    private async Task ExecuteMouseClick(MouseButton button, CancellationToken cancellationToken)
+    {
+        var downFlags = GetMouseDownFlags(button);
+        var upFlags = GetMouseUpFlags(button);
+        
+        mouse_event((uint)downFlags, 0, 0, 0, UIntPtr.Zero);
+        await Task.Delay(1, cancellationToken);
+        mouse_event((uint)upFlags, 0, 0, 0, UIntPtr.Zero);
+    }
+    
+    private async Task ExecuteMouseDoubleClick(MouseButton button, CancellationToken cancellationToken)
+    {
+        await ExecuteMouseClick(button, cancellationToken);
+        await Task.Delay(10, cancellationToken); // Short delay between clicks
+        await ExecuteMouseClick(button, cancellationToken);
+    }
+    
+    private static MouseEventFlags GetMouseDownFlags(MouseButton button)
+    {
+        return button switch
+        {
+            MouseButton.Left => MouseEventFlags.LEFTDOWN,
+            MouseButton.Right => MouseEventFlags.RIGHTDOWN,
+            MouseButton.Middle => MouseEventFlags.MIDDLEDOWN,
+            _ => MouseEventFlags.LEFTDOWN
+        };
+    }
+    
+    private static MouseEventFlags GetMouseUpFlags(MouseButton button)
+    {
+        return button switch
+        {
+            MouseButton.Left => MouseEventFlags.LEFTUP,
+            MouseButton.Right => MouseEventFlags.RIGHTUP,
+            MouseButton.Middle => MouseEventFlags.MIDDLEUP,
+            _ => MouseEventFlags.LEFTUP
+        };
+    }
+
+    #region Windows API
+
+    private const uint INPUT_MOUSE = 0;
+    private const uint INPUT_KEYBOARD = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+
+    [Flags]
+    private enum MouseEventFlags : uint
+    {
+        LEFTDOWN = 0x00000002,
+        LEFTUP = 0x00000004,
+        MIDDLEDOWN = 0x00000020,
+        MIDDLEUP = 0x00000040,
+        MOVE = 0x00000001,
+        ABSOLUTE = 0x00008000,
+        RIGHTDOWN = 0x00000008,
+        RIGHTUP = 0x00000010
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint type;
+        public InputUnion U;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+
+    [DllImport("user32.dll")]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetMessageExtraInfo();
+
+    #endregion
 }
