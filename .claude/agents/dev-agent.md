@@ -4,6 +4,7 @@ description: >
   USE PROACTIVELY after `##DISPATCH_COMPLETE##` when a worktree exists at
   ./worktrees/<TaskID> **and** docs/pm/sprint-*.md shows Status
   `⏳ In-Progress` with Assignee matching this Dev-Agent.
+  **CONCURRENT_LIMIT: 2** - Maximum 2 Dev-Agents can run simultaneously.
   Responsibilities:
     1. Implement the feature/fix described in its Task file.
     2. Create / update unit tests (2–4 assertions minimum).

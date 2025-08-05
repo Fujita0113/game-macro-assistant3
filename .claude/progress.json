@@ -1,0 +1,50 @@
+{
+  "project_id": "GameMacroAssistant",
+  "last_updated": "2025-01-15T17:30:00Z",
+  "current_phase": "development",
+  "current_sprint": "sprint-02",
+  "completed_sprints": ["sprint-01"],
+  "active_tasks": {
+    "T-002": {
+      "status": "completed",
+      "assignee": "dev-agent-1",
+      "worktree_path": "worktrees/T-002",
+      "branch_name": "task-T-002-error-logging",
+      "dependencies": [],
+      "completion_date": "2025-01-15",
+      "review_status": "approved",
+      "description": "Error Logging System Implementation"
+    },
+    "T-003": {
+      "status": "completed", 
+      "assignee": "dev-agent-2",
+      "worktree_path": "worktrees/T-003",
+      "branch_name": "task-T-003-configuration-mgmt",
+      "dependencies": [],
+      "completion_date": "2025-01-15",
+      "review_status": "approved",
+      "description": "Configuration Management Service"
+    }
+  },
+  "next_available_tasks": [
+    "T-007-image-storage",
+    "T-009-mouse-hook", 
+    "T-010-keyboard-hook",
+    "T-011-desktop-duplication"
+  ],
+  "workflow_state": {
+    "last_completed_step": "7",
+    "next_step": "2",
+    "waiting_for_user": false,
+    "user_test_pending": [],
+    "integration_completed": ["T-002", "T-003"],
+    "ready_for_next_sprint": true
+  },
+  "project_metrics": {
+    "total_tasks_planned": 25,
+    "completed_tasks": 5,
+    "in_progress_tasks": 0,
+    "test_coverage": "88.93%",
+    "sprint_velocity": 11
+  }
+}

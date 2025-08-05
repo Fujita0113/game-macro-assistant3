@@ -1,9 +1,20 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(git clean:*)",
+      "Bash(diff:*)",
+      "Bash(grep:*)",
+      "Bash(git pull:*)",
+      "Bash(git rev-list:*)",
+      "Bash(dir:*)",
+      "Bash(mv:*)",
+      "Bash(git worktree:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
-  },
-  "$schema": "https://json.schemastore.org/claude-code-settings.json"
+  }
 }
