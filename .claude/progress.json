@@ -1,17 +1,28 @@
 {
   "project_id": "GameMacroAssistant",
-  "last_updated": "2025-01-15T17:30:00Z",
+  "last_updated": "2025-08-05T14:30:00Z",
   "current_phase": "development",
   "current_sprint": "sprint-02",
   "completed_sprints": ["sprint-01"],
+  
   "active_tasks": {
+    "T-001": {
+      "status": "completed",
+      "assignee": "dev-agent-1",
+      "worktree_path": "worktrees/T-001",
+      "branch_name": "task-T-001-core-models",
+      "dependencies": [],
+      "completion_date": "2025-08-05",
+      "review_status": "approved",
+      "description": "Core Models Implementation"
+    },
     "T-002": {
       "status": "completed",
       "assignee": "dev-agent-1",
       "worktree_path": "worktrees/T-002",
       "branch_name": "task-T-002-error-logging",
       "dependencies": [],
-      "completion_date": "2025-01-15",
+      "completion_date": "2025-08-05",
       "review_status": "approved",
       "description": "Error Logging System Implementation"
     },
@@ -21,30 +32,77 @@
       "worktree_path": "worktrees/T-003",
       "branch_name": "task-T-003-configuration-mgmt",
       "dependencies": [],
-      "completion_date": "2025-01-15",
+      "completion_date": "2025-08-05",
       "review_status": "approved",
       "description": "Configuration Management Service"
     }
   },
+  
+  "current_working_tasks": {
+    "T-007": {
+      "status": "in_progress",
+      "assignee": "dev-agent-1", 
+      "worktree_path": "worktrees/T-007",
+      "branch_name": "task-T-007-mouse-hook",
+      "description": "Windows Mouse Hook Implementation",
+      "current_step": "implementation",
+      "current_substep": "writing_unit_tests",
+      "last_action": "completed core implementation, started unit tests",
+      "interruption_point": {
+        "timestamp": "2025-08-05T14:22:00Z",
+        "reason": "workflow_improvement_session",
+        "context": "paused development to implement workflow management improvements",
+        "next_action": "resume mouse hook implementation after workflow improvements",
+        "files_modified": ["src/Services/MouseHookService.cs", "tests/Services/MouseHookServiceTests.cs"]
+      },
+      "progress_details": {
+        "implementation_progress": "60%",
+        "test_progress": "20%",
+        "estimated_completion": "2025-08-05T17:00:00Z"
+      }
+    }
+  },
+  
   "next_available_tasks": [
-    "T-007-image-storage",
-    "T-009-mouse-hook", 
-    "T-010-keyboard-hook",
-    "T-011-desktop-duplication"
+    "T-008-image-storage",
+    "T-009-keyboard-hook",
+    "T-010-desktop-duplication",
+    "T-011-ui-automation"
   ],
+  
   "workflow_state": {
-    "last_completed_step": "7",
-    "next_step": "2",
+    "last_completed_step": "8",
+    "next_step": "9",
     "waiting_for_user": false,
     "user_test_pending": [],
-    "integration_completed": ["T-002", "T-003"],
-    "ready_for_next_sprint": true
+    "integration_completed": ["T-001", "T-002", "T-003"],
+    "ready_for_next_sprint": false,
+    "active_agents": {
+      "dev-agent-1": {
+        "current_task": "T-007",
+        "status": "paused",
+        "last_heartbeat": "2025-08-05T14:22:00Z"
+      },
+      "dev-agent-2": {
+        "current_task": null,
+        "status": "idle",
+        "last_heartbeat": "2025-08-05T13:45:00Z"
+      }
+    }
   },
+  
   "project_metrics": {
     "total_tasks_planned": 25,
-    "completed_tasks": 5,
-    "in_progress_tasks": 0,
-    "test_coverage": "88.93%",
-    "sprint_velocity": 11
+    "completed_tasks": 3,
+    "in_progress_tasks": 1,
+    "test_coverage": "85.2%",
+    "sprint_velocity": 8
+  },
+  
+  "session_context": {
+    "last_session_end": "2025-08-05T14:22:00Z",
+    "interruption_cause": "workflow_improvement_session",
+    "recovery_priority": ["T-007"],
+    "user_last_instruction": "improve workflow management system with progress visualization"
   }
 }

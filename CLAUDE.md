@@ -115,22 +115,118 @@ GameMacroAssistantは、Windows 11マクロ自動化ツールの開発プロジ�
 
 ## メインエージェント統括機能
 
-### ワークフロー制御（主エージェント責任）
-- **フェーズ自動判定**: progress.jsonの状態分析による次フェーズ決定
-- **エージェント自動起動**: 現在フェーズに応じた適切なサブエージェント呼び出し
-- **依存関係自動管理**: タスク間依存関係の追跡・実行順序制御
-- **ブロッカー自動検出**: 作業停滞要因の特定・解決策自動提示
+### ワークフロー制御システム（WorkflowController.py活用）
 
-### 進捗監視・制御
-- **状態リアルタイム把握**: progress.json + sprint files継続監視
-- **メトリクス活用判断**: テストカバレッジ・ベロシティによる品質ゲート
-- **並行処理制御**: Dev-Agent同時実行制限（最大2）の動的管理
-- **ユーザー介入最小化**: 自動化可能な判断の機械実行
+#### メインエージェント実行ルール
+1. **セッション開始時**: 必ず`python src/WorkflowStateMachine.py` 実行 → 現在フェーズ・次アクション自動判定・中断復帰対応
+2. **進捗確認要求時**: `python src/ProgressVisualizer.py` 実行 → 視覚的ダッシュボード表示
+3. **ユーザー指示受領時**: 状態確認 → 適切なエージェント自動選択・起動
+4. **エラー・ブロック検出時**: 状態分析 → 解決策提示・適切エージェント呼び出し
+5. **作業中断時**: progress.jsonに中断情報記録 → `current_working_tasks`に詳細保存
 
-### 品質保証自動制御
-- **統合条件自動チェック**: 完了基準（カバレッジ80%+、テスト全通過）検証
-- **フェーズゲート制御**: 条件未達時の自動ブロック・改善指示
-- **エスカレーション自動判定**: 人的介入必要時の明確化・通知
+#### データ更新責任分担
+- **Dev-Agent**: タスク完了時 → `active_tasks[TaskID].status = "completed"`
+- **Review-Agent**: レビュー完了時 → `active_tasks[TaskID].review_status = "approved"`
+- **Integrator-Agent**: 統合完了時 → `integration_completed[]` 追加・`ready_for_next_sprint = true`
+- **Planner-Agent**: 新スプリント作成時 → `current_sprint` 更新・`next_available_tasks` 更新
+- **TestDoc-Agent**: テスト準備完了時 → `user_test_pending[]` 追加
+- **User-Test-Coordinator**: テスト完了時 → `user_test_pending[]` クリア
+
+#### 自動ワークフロー制御
+- **フェーズ自動判定**: progress.json状態分析による5フェーズ自動判定
+- **エージェント自動起動**: 現在フェーズ → 最適エージェント自動選択
+- **並行処理動的制御**: Dev-Agent最大2同時実行の自動管理
+- **品質ゲート自動制御**: カバレッジ80%+基準による統合可否判定
+
+### メインエージェント自動実行ルール
+
+#### 必須実行タイミング
+1. **セッション開始時**: 必ず`python src/WorkflowStateMachine.py`実行 → 中断復帰・フェーズ判定
+2. **進捗報告時**: 必ず`python src/ProgressVisualizer.py`実行 → ダッシュボード表示
+3. **ユーザー質問応答時**: WorkflowStateMachine.py結果に基づいて適切な回答
+4. **エージェント完了シグナル検知時**: 
+   - `##DEV_DONE##` → Review-Agent自動起動
+   - `##REVIEW_PASS##` → TestDoc-Agent自動起動  
+   - `##TESTDOC_COMPLETE##` → User-Test-Coordinator自動起動
+   - `##PLANNING_COMPLETE##` → TaskGen-Agent→Dispatcher-Agent連鎖起動
+
+#### WorkflowStateMachine活用パターン
+```python
+# セッション開始時の基本フロー
+from WorkflowStateMachine import WorkflowStateMachine
+from ProgressVisualizer import ProgressVisualizer
+
+# 1. 状態確認（必須）
+workflow = WorkflowStateMachine()
+summary = workflow.get_workflow_summary()
+current_phase = summary['current_phase']
+next_actions = summary['next_actions']
+
+# 2. 進捗可視化（進捗確認時）
+visualizer = ProgressVisualizer()
+visualizer.show_dashboard()
+
+# 3. フェーズ別アクション自動決定
+if current_phase == "resuming_work":
+    # 中断復帰処理
+    interrupted_tasks = summary.get('interrupted_tasks', {})
+    for task_id, task_data in interrupted_tasks.items():
+        assignee = task_data.get('assignee')
+        launch_agent(assignee, f"resume {task_id}")
+elif current_phase == "development":  
+    launch_dev_agents(next_actions)
+```
+
+### 実行フロー例
+```
+1. ユーザー指示受領 → WorkflowStateMachine.py実行
+2. フェーズ判定: "resuming_work" → 中断タスク: "T-007"
+3. 中断復帰情報表示 → ProgressVisualizer.py実行
+4. ダッシュボード表示 → Dev-Agent自動アサイン
+5. T-007復帰開始 → 並行開発再開
+```
+
+### 中断復帰対応構造
+```json
+{
+  "current_working_tasks": {
+    "T-007": {
+      "status": "in_progress",
+      "assignee": "dev-agent-1",
+      "current_step": "implementation",
+      "current_substep": "writing_unit_tests",
+      "interruption_point": {
+        "timestamp": "2025-08-05T14:22:00Z",
+        "reason": "api_timeout",
+        "context": "writing test for MouseHookService.Initialize method",
+        "next_action": "complete unit test implementation",
+        "files_modified": ["src/Services/MouseHookService.cs"]
+      }
+    }
+  }
+}
+```
+
+## エージェント間データ連携フロー
+
+### progress.json更新チェーン
+```mermaid
+graph TD
+    A[Planner-Agent] -->|current_sprint, next_available_tasks| B[progress.json]
+    C[Dev-Agent] -->|active_tasks.status = completed| B
+    D[Review-Agent] -->|active_tasks.review_status = approved| B
+    E[TestDoc-Agent] -->|user_test_pending[] += TaskID| B
+    F[User-Test-Coordinator] -->|user_test_pending[] = []| B
+    G[Integrator-Agent] -->|integration_completed[], ready_for_next_sprint| B
+    B -->|State Change| H[WorkflowController監視]
+    H -->|Next Action Decision| I[メインエージェント]
+```
+
+### データ整合性保証
+- **Atomic Updates**: 各エージェントはprogress.json更新を単一操作で実行
+- **Version Control**: 各更新で`last_updated`タイムスタンプ更新
+- **Validation**: WorkflowController.pyが状態妥当性チェック実行
+- **Recovery**: 不整合検出時の自動修復・ユーザー通知機能
 
 ## エージェント定義
 - **Intake-Agent** (file=".claude/agents/intake-agent.md"): 要件定義の構造化・分析
