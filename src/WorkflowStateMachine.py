@@ -8,11 +8,24 @@ import json
 import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
+try:
+    from .SignalParser import validate_completion_signal, SignalParser
+    from .ArtifactValidator import ArtifactValidator
+    from .ProgressManager import ProgressManager
+except ImportError:
+    # 直接実行時のフォールバック
+    import sys
+    import os
+    sys.path.append(os.path.dirname(__file__))
+    from SignalParser import validate_completion_signal, SignalParser
+    from ArtifactValidator import ArtifactValidator
+    from ProgressManager import ProgressManager
 
 class WorkflowStateMachine:
     def __init__(self, progress_file_path: str = ".claude/progress.json"):
         self.progress_file = progress_file_path
         self.progress_data = None
+        self.progress_manager = ProgressManager(progress_file_path)
         self.load_progress()
     
     def load_progress(self) -> bool:
@@ -167,6 +180,145 @@ class WorkflowStateMachine:
         
         allowed_transitions = phase_transitions.get(current_phase, [])
         return next_action in allowed_transitions or next_action == "error_handling"
+    
+    def handle_completion_signal(self, raw_signal: str) -> Tuple[bool, str]:
+        """
+        エージェントからの完了シグナルを処理
+        
+        Returns:
+            (success, message)
+        """
+        # シグナル検証
+        is_valid, message, parsed_signal = validate_completion_signal(raw_signal)
+        
+        if not is_valid:
+            return False, f"Signal validation failed: {message}"
+        
+        # TaskID抽出
+        parser = SignalParser()
+        task_id = parser.extract_task_id_from_evidence(parsed_signal.evidence)
+        if not task_id:
+            return False, "TaskID could not be extracted from evidence"
+        
+        # シグナル種別ごとの処理
+        signal_type = parsed_signal.signal_type
+        
+        try:
+            if signal_type == "##DEV_DONE##":
+                return self._handle_dev_done(task_id, parsed_signal.evidence)
+            elif signal_type == "##REVIEW_PASS##":
+                return self._handle_review_pass(task_id, parsed_signal.evidence)
+            elif signal_type == "##REVIEW_FAIL##":
+                return self._handle_review_fail(task_id, parsed_signal.evidence)
+            elif signal_type == "##TESTDOC_COMPLETE##":
+                return self._handle_testdoc_complete(task_id, parsed_signal.evidence)
+            elif signal_type.endswith("_FAILED##"):
+                return self._handle_failure_signal(task_id, parsed_signal.evidence, signal_type)
+            else:
+                return False, f"Unknown signal type: {signal_type}"
+                
+        except Exception as e:
+            return False, f"Signal processing error: {e}"
+    
+    def _handle_dev_done(self, task_id: str, evidence: Dict) -> Tuple[bool, str]:
+        """Dev-Agent完了シグナル処理（成果物検証を含む）"""
+        # 1. 証跡の基本検証
+        validator = ArtifactValidator()
+        evidence_valid, evidence_errors = validator.validate_agent_evidence(evidence)
+        
+        if not evidence_valid:
+            return False, f"Evidence validation failed: {'; '.join(evidence_errors)}"
+        
+        # 2. 実際の成果物検証（重要！）
+        artifacts_valid, validation_message, validation_details = validator.validate_task_completion(task_id)
+        
+        if not artifacts_valid:
+            print(f"[DEV_DONE_REJECTED] Task {task_id} artifacts validation failed:")
+            print(f"  Reason: {validation_message}")
+            for error in validation_details.get("errors", []):
+                print(f"  - {error}")
+            
+            # Dev-Agentに詳細な再作業指示を送信
+            return False, f"Artifact validation failed: {validation_message}. Please verify actual implementation exists and builds successfully."
+        
+        # 3. Progress更新（中央管理）
+        try:
+            evidence_for_progress = {
+                "completion_evidence": validation_details,
+                "validation_timestamp": datetime.now().isoformat(),
+                "implementation_files": evidence.get("files", []),
+                "test_results": validation_details.get("test_results", {})
+            }
+            
+            self.progress_manager.update_task_status(
+                task_id, 
+                "review_pending", 
+                evidence_for_progress,
+                "dev_done_signal_processed"
+            )
+            
+        except Exception as e:
+            print(f"Warning: Progress update failed: {e}")
+        
+        # 4. 成果物検証成功 - Review-Agentに移行
+        print(f"[DEV_DONE] Task {task_id} fully validated. Moving to review phase.")
+        print(f"  Build: ✅ Success")
+        print(f"  Tests: ✅ {validation_details.get('test_results', {}).get('passed_count', 0)} passed")
+        print(f"  Files: ✅ All required files present")
+        
+        return True, f"Task {task_id} ready for review - all artifacts verified"
+    
+    def _handle_review_pass(self, task_id: str, evidence: Dict) -> Tuple[bool, str]:
+        """Review-Agent承認シグナル処理"""
+        coverage = evidence.get("coverage_percent")
+        issues = evidence.get("issues_found", "0")
+        
+        print(f"[REVIEW_PASS] Task {task_id} approved. Coverage: {coverage}%, Issues: {issues}")
+        
+        # TestDoc-Agentに移行
+        return True, f"Task {task_id} ready for test documentation"
+    
+    def _handle_review_fail(self, task_id: str, evidence: Dict) -> Tuple[bool, str]:
+        """Review-Agent却下シグナル処理"""
+        reasons = evidence.get("failure_reasons", [])
+        issues_count = evidence.get("issues_found", "unknown")
+        
+        print(f"[REVIEW_FAIL] Task {task_id} rejected. Issues: {issues_count}, Reasons: {reasons}")
+        
+        # Dev-Agentに差し戻し
+        return True, f"Task {task_id} needs rework: {', '.join(reasons)}"
+    
+    def _handle_testdoc_complete(self, task_id: str, evidence: Dict) -> Tuple[bool, str]:
+        """TestDoc-Agent完了シグナル処理"""
+        test_file = evidence.get("test_file_path")
+        test_count = evidence.get("test_count")
+        estimated_time = evidence.get("estimated_minutes")
+        
+        if not os.path.exists(test_file):
+            return False, f"Test document not found: {test_file}"
+        
+        # Progress更新 - ユーザーテスト待ちに追加
+        try:
+            self.progress_manager.add_user_test_pending(task_id, evidence)
+        except Exception as e:
+            print(f"Warning: User test pending update failed: {e}")
+        
+        print(f"[TESTDOC_COMPLETE] Task {task_id} test doc ready. {test_count} tests, ~{estimated_time} min")
+        
+        # User-Test-Coordinatorに移行
+        return True, f"Task {task_id} ready for user testing"
+    
+    def _handle_failure_signal(self, task_id: str, evidence: Dict, signal_type: str) -> Tuple[bool, str]:
+        """失敗シグナル処理"""
+        failure_reason = evidence.get("failure_reason", "unknown")
+        error_details = evidence.get("error_details", "")
+        
+        print(f"[{signal_type}] Task {task_id} failed: {failure_reason}")
+        if error_details:
+            print(f"[Details] {error_details}")
+        
+        # BugFix-Agentやエラーハンドリングに移行
+        return True, f"Task {task_id} failure recorded, requires intervention"
 
 def main():
     """メイン実行関数"""

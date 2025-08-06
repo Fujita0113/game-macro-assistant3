@@ -73,7 +73,18 @@ git commit -m "feat: <brief> (close <TaskID>)\n\nTest: pass\nCoverage: <pct>%"
   Assignee → (kept)
   ```
 * Save and (optionally) `git add` & commit sprint file update.
-* Print summary table and `##DEV_DONE##`.
+* Print summary table and completion signal with evidence:
+  ```
+  ##DEV_DONE##|evidence:{
+    "task_id": "<TaskID>",
+    "files": ["src/path/Implementation.cs", "tests/path/ImplementationTests.cs"],
+    "build_status": "success|failed",
+    "test_coverage": "<percentage>%",
+    "tests_passing": <count>,
+    "tests_total": <count>,
+    "warnings_count": <count>
+  }
+  ```
 
 ## 5. Fail Handling
 
@@ -82,7 +93,16 @@ git commit -m "feat: <brief> (close <TaskID>)\n\nTest: pass\nCoverage: <pct>%"
 
   * Revert sprint row to ❌ Todo
   * Commit WIP branch if code is worth review
-  * Print `##DEV_FAILED##` plus short fail reason.
+  * Print failure signal with evidence:
+    ```
+    ##DEV_FAILED##|evidence:{
+      "task_id": "<TaskID>",
+      "failure_reason": "Build failed|Tests failed|Timeout",
+      "attempted_files": ["list", "of", "files"],
+      "error_details": "specific error message",
+      "worktree_path": "worktrees/<TaskID>"
+    }
+    ```
 
 ## 6. Safety Rules
 
@@ -90,7 +110,13 @@ git commit -m "feat: <brief> (close <TaskID>)\n\nTest: pass\nCoverage: <pct>%"
 * **Never** force-push main or other branches.
 * Keep commits atomic & signed-off.
 
-## 7. Error Handling & Escalation
+## 7. Progress Update Restriction
+**DIRECT PROGRESS.JSON UPDATES ARE PROHIBITED**
+- All status changes must be communicated via completion signals with evidence
+- Main-agent will update progress.json based on signal validation
+- Include comprehensive evidence (files, build status, test results) in completion signals
+
+## 8. Error Handling & Escalation
 
 ### Failure Signals
 * Print `##DEV_FAILED##` when unable to resolve issues within 30min

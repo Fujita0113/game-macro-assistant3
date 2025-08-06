@@ -110,7 +110,7 @@ GameMacroAssistantは、Windows 11マクロ自動化ツールの開発プロジ�
 14. **本統合**: Integrator-Agentがtask→mainマージ・統合検証
 
 ### フェーズ5: 次サイクル移行
-15. **進捗更新**: 完了タスクをprogress.jsonに記録
+15. **進捗更新**: メインエージェントが完了タスクをprogress.jsonに記録（権限中央集権化）
 16. **次回計画**: 新たに実行可能になったタスクでフェーズ1に戻る
 
 ## メインエージェント統括機能
@@ -123,20 +123,23 @@ GameMacroAssistantは、Windows 11マクロ自動化ツールの開発プロジ�
 3. **ユーザー指示受領時**: 状態確認 → 適切なエージェント自動選択・起動
 4. **エラー・ブロック検出時**: 状態分析 → 解決策提示・適切エージェント呼び出し
 5. **作業中断時**: progress.jsonに中断情報記録 → `current_working_tasks`に詳細保存
+6. **完了シグナル検出時**: WorkflowStateMachine.handle_completion_signal()で自動処理・成果物検証
 
-#### データ更新責任分担
-- **Dev-Agent**: タスク完了時 → `active_tasks[TaskID].status = "completed"`
-- **Review-Agent**: レビュー完了時 → `active_tasks[TaskID].review_status = "approved"`
-- **Integrator-Agent**: 統合完了時 → `integration_completed[]` 追加・`ready_for_next_sprint = true`
-- **Planner-Agent**: 新スプリント作成時 → `current_sprint` 更新・`next_available_tasks` 更新
-- **TestDoc-Agent**: テスト準備完了時 → `user_test_pending[]` 追加
-- **User-Test-Coordinator**: テスト完了時 → `user_test_pending[]` クリア
+#### データ更新責任分担（権限中央集権化後）
+- **メインエージェント**: **progress.json更新の唯一の権限者** - 全状態変更を証跡付きで実行
+- **Dev-Agent**: 完了シグナル送信 → メインが`active_tasks[TaskID].status = "review_pending"`に更新
+- **Review-Agent**: 承認/却下シグナル送信 → メインが`active_tasks[TaskID].review_status`を更新
+- **TestDoc-Agent**: 完了シグナル送信 → メインが`user_test_pending[]`に追加
+- **User-Test-Coordinator**: 完了通知 → メインが`user_test_pending[]`をクリア
+- **Integrator-Agent**: 統合完了報告 → メインが`integration_completed[]`・`ready_for_next_sprint`を更新
+- **全サブエージェント**: **直接progress.json更新は禁止** - シグナル経由でのみ状態変更要求
 
 #### 自動ワークフロー制御
 - **フェーズ自動判定**: progress.json状態分析による5フェーズ自動判定
 - **エージェント自動起動**: 現在フェーズ → 最適エージェント自動選択
 - **並行処理動的制御**: Dev-Agent最大2同時実行の自動管理
-- **品質ゲート自動制御**: カバレッジ80%+基準による統合可否判定
+- **品質ゲート自動制御**: ArtifactValidator・カバレッジ80%+基準による統合可否判定
+- **成果物検証必須**: 全タスク完了時にworktree存在・ビルド成功・テスト通過を実証
 
 ### メインエージェント自動実行ルール
 
@@ -144,11 +147,79 @@ GameMacroAssistantは、Windows 11マクロ自動化ツールの開発プロジ�
 1. **セッション開始時**: 必ず`python src/WorkflowStateMachine.py`実行 → 中断復帰・フェーズ判定
 2. **進捗報告時**: 必ず`python src/ProgressVisualizer.py`実行 → ダッシュボード表示
 3. **ユーザー質問応答時**: WorkflowStateMachine.py結果に基づいて適切な回答
-4. **エージェント完了シグナル検知時**: 
-   - `##DEV_DONE##` → Review-Agent自動起動
-   - `##REVIEW_PASS##` → TestDoc-Agent自動起動  
-   - `##TESTDOC_COMPLETE##` → User-Test-Coordinator自動起動
+4. **エージェント完了シグナル検知時（自動処理必須）**: 
+   - `##DEV_DONE##|evidence:{...}` → ArtifactValidator実行・成果物検証 → Review-Agent自動起動
+   - `##REVIEW_PASS##|evidence:{...}` → TestDoc-Agent自動起動  
+   - `##TESTDOC_COMPLETE##|evidence:{...}` → User-Test-Coordinator自動起動
    - `##PLANNING_COMPLETE##` → TaskGen-Agent→Dispatcher-Agent連鎖起動
+   
+   **重要**: 新形式シグナル（evidence付き）のみ受付。旧形式は自動拒否。
+
+#### 完了シグナル形式仕様（施策3：証跡義務化）
+
+**新形式（必須）**:
+```
+##SIGNAL_TYPE##|evidence:{"key":"value",...}
+```
+
+**Dev-Agent完了シグナル例**:
+```json
+##DEV_DONE##|evidence:{
+  "task_id": "T-009",
+  "files": ["src/GameMacroAssistant.Core/Services/KeyboardHookService.cs", 
+           "src/GameMacroAssistant.Tests/Services/KeyboardHookServiceTests.cs"],
+  "build_status": "success",
+  "test_coverage": "85%",
+  "tests_passing": 15,
+  "tests_total": 15,
+  "warnings_count": 0
+}
+```
+
+**Review-Agent完了シグナル例**:
+```json
+##REVIEW_PASS##|evidence:{
+  "task_id": "T-009", 
+  "reviewed_files": ["src/Services/KeyboardHookService.cs"],
+  "coverage_percent": "85",
+  "issues_found": "0",
+  "static_analysis_result": "clean",
+  "worktree_path": "worktrees/T-009"
+}
+```
+
+**TestDoc-Agent完了シグナル例**:
+```json
+##TESTDOC_COMPLETE##|evidence:{
+  "task_id": "T-009",
+  "test_file_path": "docs/user-tests/T-009.md", 
+  "test_count": 3,
+  "estimated_minutes": 10,
+  "worktree_path": "worktrees/T-009"
+}
+```
+
+**旧形式（拒否される）**:
+```
+##DEV_DONE##          ← 証跡なし、自動拒否
+##REVIEW_PASS##       ← 証跡なし、自動拒否
+```
+
+#### 証跡検証ルール
+
+**必須フィールド**:
+- **implementation**: `["files", "build_status", "test_coverage"]`
+- **review**: `["reviewed_files", "coverage_percent", "issues_found"]`
+- **testdoc**: `["test_file_path", "test_count", "estimated_minutes"]`
+
+**ファイル存在確認**:
+- `files`, `reviewed_files`, `test_file_path`に指定されたパスの実在を自動検証
+- 存在しないファイルパスがある場合、シグナル拒否
+
+**形式検証**:
+- JSON形式不正 → シグナル拒否
+- 必須フィールド欠如 → シグナル拒否  
+- ファイルパス不存在 → シグナル拒否
 
 #### WorkflowStateMachine活用パターン
 ```python
@@ -166,7 +237,17 @@ next_actions = summary['next_actions']
 visualizer = ProgressVisualizer()
 visualizer.show_dashboard()
 
-# 3. フェーズ別アクション自動決定
+# 3. 完了シグナル自動処理（エージェント出力監視時）
+def handle_agent_output(agent_output: str):
+    if "##DEV_DONE##" in agent_output or "##REVIEW_PASS##" in agent_output or "##TESTDOC_COMPLETE##" in agent_output:
+        success, message = workflow.handle_completion_signal(agent_output)
+        if success:
+            print(f"[SIGNAL_PROCESSED] {message}")
+        else:
+            print(f"[SIGNAL_REJECTED] {message}")
+            # エージェントに再作業指示
+
+# 4. フェーズ別アクション自動決定
 if current_phase == "resuming_work":
     # 中断復帰処理
     interrupted_tasks = summary.get('interrupted_tasks', {})
@@ -209,24 +290,34 @@ elif current_phase == "development":
 
 ## エージェント間データ連携フロー
 
-### progress.json更新チェーン
+### progress.json更新チェーン（権限中央集権化後）
 ```mermaid
 graph TD
-    A[Planner-Agent] -->|current_sprint, next_available_tasks| B[progress.json]
-    C[Dev-Agent] -->|active_tasks.status = completed| B
-    D[Review-Agent] -->|active_tasks.review_status = approved| B
-    E[TestDoc-Agent] -->|user_test_pending[] += TaskID| B
-    F[User-Test-Coordinator] -->|user_test_pending[] = []| B
-    G[Integrator-Agent] -->|integration_completed[], ready_for_next_sprint| B
-    B -->|State Change| H[WorkflowController監視]
-    H -->|Next Action Decision| I[メインエージェント]
+    A[Dev-Agent] -->|##DEV_DONE##シグナル| B[メインエージェント]
+    C[Review-Agent] -->|##REVIEW_PASS##シグナル| B
+    D[TestDoc-Agent] -->|##TESTDOC_COMPLETE##シグナル| B
+    E[User-Test-Coordinator] -->|完了通知| B
+    F[Integrator-Agent] -->|統合完了報告| B
+    B -->|ArtifactValidator検証| G[progress.json]
+    B -->|ProgressManager更新| G
+    G -->|State Change| H[WorkflowStateMachine]
+    H -->|Next Action Decision| B
+    
+    style B fill:#ff9999
+    style G fill:#99ff99
 ```
+**重要**: メインエージェントのみがprogress.json更新権限を持つ
 
-### データ整合性保証
-- **Atomic Updates**: 各エージェントはprogress.json更新を単一操作で実行
-- **Version Control**: 各更新で`last_updated`タイムスタンプ更新
-- **Validation**: WorkflowController.pyが状態妥当性チェック実行
-- **Recovery**: 不整合検出時の自動修復・ユーザー通知機能
+### データ整合性保証（権限中央集権化後）
+- **Central Authority**: メインエージェントのみがprogress.json更新を実行 - 権限チェック・証跡検証付き
+- **Atomic Updates**: ProgressManagerが原子的更新・バックアップ・rollback機能を提供
+- **Evidence Required**: 全状態変更に成果物パス・検証結果等の証跡を必須化
+- **Permission Control**: サブエージェントの直接更新試行はPermissionErrorで阻止
+- **Signal Validation**: SignalParserが完了シグナルの形式・証跡妥当性を事前検証
+  - 新形式必須：`##SIGNAL##|evidence:{...}` - 旧形式は自動拒否
+  - 必須フィールド検証：タスク種別ごとの証跡要件チェック
+  - ファイル実在確認：指定パスの存在検証（偽装防止）
+  - JSON形式検証：evidence部分の構文チェック
 
 ## エージェント定義
 - **Intake-Agent** (file=".claude/agents/intake-agent.md"): 要件定義の構造化・分析
