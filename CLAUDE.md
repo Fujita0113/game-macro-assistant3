@@ -105,13 +105,13 @@ GameMacroAssistantは、Windows 11マクロ自動化ツールの開発プロジ�
 
 ### フェーズ4: ユーザー検証・統合
 11. **ユーザーテスト**: ユーザーによる機能検証・バグ報告受付
-12. **バグ修正サイクル**: BugFix-Agentがログ分析→問題特定→修正実装を反復
-13. **統合準備**: 全テスト完了後、main→taskブランチプル・結合テスト実行
-14. **本統合**: Integrator-Agentがtask→mainマージ・統合検証
+12. **バグ修正サイクル**: BugFix-Agentが `docs/bugfix/<TaskID>-bug-report.md` と `worktrees/<TaskID>/bugfix.log` を出力し、Dev-Agent が参照して修正実装を反復
+13. **統合準備**: User-Test-Coordinator が `docs/integration/ready.md` を作成し、統合対象タスクを明示
+14. **本統合**: Integrator-Agentが `docs/integration/<TaskID>-integration.md` を生成しつつ task→main マージ・統合検証
 
 ### フェーズ5: 次サイクル移行
 15. **進捗更新**: メインエージェントが完了タスクをprogress.jsonに記録（権限中央集権化）
-16. **次回計画**: 新たに実行可能になったタスクでフェーズ1に戻る
+16. **次回計画**: ユーザーテスト後の仕様調整や追加要件があればIntake-Agentが要件を更新し、DocGen-Agent・Planner-Agentが次スプリント計画に反映。新たに実行可能になったタスクでフェーズ1に戻る
 
 ## メインエージェント統括機能
 

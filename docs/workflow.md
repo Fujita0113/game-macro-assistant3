@@ -24,6 +24,7 @@ graph TD
     L2 --> |Present tests| M[User Testing]
     M --> |TESTING_COMPLETE| N[Integrator-Agent]
     M --> |BUGS_FOUND| L[BugFix-Agent]
+    M --> |Spec Change| B[Intake-Agent]
     
     L --> |Bug analysis| O[Dev-Agent for fixes]
     O --> |##DEV_DONE##| J
@@ -32,6 +33,8 @@ graph TD
     P --> |Next sprint needed| D
     P --> |All WBS complete| Q[Project Complete]
 ```
+
+ユーザーテストで仕様の差異や追加要望が発生した場合は、Intake-Agentに戻って要件を更新し、DocGen-Agent・Planner-Agentが次スプリントに反映します。
 
 ## エージェント間の連携シグナル
 
@@ -58,9 +61,10 @@ graph TD
 | Dispatcher-Agent | Sprint plan + Task files | Git worktrees<br>Updated sprint status | 作業環境の準備 |
 | Dev-Agent | Worktree + Task spec | Implemented code<br>Unit tests<br>`test.log` | 動作するコード |
 | Review-Agent | Dev completion | Code review<br>`docs/reviews/<TaskID>.md`<br>Coverage report | 品質承認 |
-| TestDoc-Agent | Review pass | UI test specifications<br>Test branch info | テスト手順書 |
-| BugFix-Agent | Failure signals | Bug analysis<br>Debug logs<br>Fix recommendations | 問題解決指針 |
-| Integrator-Agent | User test approval | Merged main branch<br>Clean integration | 本番準備完了 |
+| TestDoc-Agent | Review pass | UI test specifications<br>Test branch info | User-Test-Coordinator が `docs/user-tests/<TaskID>.md` を参照 |
+| User-Test-Coordinator | Test docs from TestDoc-Agent | `docs/integration/ready.md` | Integrator-Agent が統合対象を決定 |
+| BugFix-Agent | Failure signals | `docs/bugfix/<TaskID>-bug-report.md`<br>`worktrees/<TaskID>/bugfix.log` | Dev-Agent が修正実装に使用 |
+| Integrator-Agent | User test approval | `docs/integration/<TaskID>-integration.md`<br>Merged main branch | Loop-Controller が次計画に使用 |
 | Loop-Controller | Integration complete | Next cycle planning | 継続的開発 |
 
 ## エラーハンドリングフロー
