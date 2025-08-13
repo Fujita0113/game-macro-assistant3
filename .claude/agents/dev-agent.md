@@ -40,6 +40,7 @@ test\_command  : {{test\_command}}
 
 ````
 - Sprint file row where **TaskID == <TaskID>**
+- BugFix context (存在する場合): `docs/bugfix/<TaskID>-bug-report.md` と `worktrees/<TaskID>/bugfix.log` を参照
 
 ## 1. Plan Briefly (max 200 words)
 - Summarise the change, files to touch, new test cases.
